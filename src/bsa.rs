@@ -1,7 +1,10 @@
+//! picks apart bsa archives
+//!
+//! note: this could be significantly optimized by not allocing memory per-file,
+//! and instead leaving slices into the original data (cf: the `bytes` crate).
+
 use byteorder::{ReadBytesExt, LE};
-use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
-use std::path::Path;
 use thiserror::Error;
 
 use crate::util::parse_zstring;
@@ -10,12 +13,12 @@ use crate::util::parse_zstring;
 pub enum Error {
     #[error("bad BSA header magic")]
     BadMagic,
+
     #[error("i/o error")]
     IoError(#[from] std::io::Error),
+
     #[error("bad filename encoding")]
     BadFilenameEncoding(std::ffi::IntoStringError),
-    #[error("woof")]
-    Xxx,
 }
 
 type Result<T> = std::result::Result<T, Error>;
@@ -91,7 +94,10 @@ where
     Ok(names)
 }
 
-fn parse_hashes<R>(rdr: &mut R, n_files: u32) -> Result<Vec<u64>> where R: Read + ReadBytesExt {
+fn parse_hashes<R>(rdr: &mut R, n_files: u32) -> Result<Vec<u64>>
+where
+    R: Read + ReadBytesExt,
+{
     let mut hashes = Vec::new();
     for _ in 0..n_files {
         hashes.push(rdr.read_u64::<LE>()?);
@@ -103,6 +109,8 @@ fn parse_hashes<R>(rdr: &mut R, n_files: u32) -> Result<Vec<u64>> where R: Read 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs::File;
+    use std::path::Path;
     #[test]
     fn test_parse_header() {
         let mut rdr = std::io::Cursor::new(&[
